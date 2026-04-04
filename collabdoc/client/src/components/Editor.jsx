@@ -149,12 +149,13 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
       if (userName === user.name) return
       setTypingUser(userName)
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
-      typingTimerRef.current = setTimeout(() => setTypingUser(''), 2500)
+      typingTimerRef.current = setTimeout(() => setTypingUser(''), 3000)
     })
 
     socket.on('stop-typing', ({ userName }) => {
       if (userName === user.name) return
       setTypingUser('')
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
     })
 
     // Lock event from server
