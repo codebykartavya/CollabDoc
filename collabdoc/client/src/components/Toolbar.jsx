@@ -1,4 +1,5 @@
 import SpeechButton from './SpeechButton'
+import FileUploadButton from './FileUploadButton'
 
 export default function Toolbar({ editor }) {
   if (!editor) return null
@@ -23,6 +24,7 @@ export default function Toolbar({ editor }) {
       <button onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className={`${btnBase} ${editor.isActive('heading', { level: 2 }) ? btnActive : btnInactive}`}>H2</button>
       <button onClick={() => editor.chain().focus().toggleBulletList().run()} className={`${btnBase} ${editor.isActive('bulletList') ? btnActive : btnInactive}`}>List</button>
       <div className="w-px h-5 bg-gray-200 dark:bg-slate-600 mx-1" />
+      <FileUploadButton editor={editor} />
       <SpeechButton editor={editor} />
     </div>
   )
