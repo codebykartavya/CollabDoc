@@ -70,6 +70,10 @@ io.on('connection', (socket) => {
     socket.to(docId).emit('typing', { userName });
   });
 
+  socket.on('user-stop-typing', ({ docId, userName }) => {
+    socket.to(docId).emit('stop-typing', { userName });
+  });
+
   socket.on('pomodoro-start', ({ docId, timeLeft, isBreak }) => {
     socket.to(docId).emit('pomodoro-sync', { timeLeft, isRunning: true, isBreak });
   });

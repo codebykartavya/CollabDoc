@@ -45,6 +45,7 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
   const [lockedBanner, setLockedBanner] = useState(false)
 
   const typingTimerRef = useRef(null)
+  const stopTypingTimerRef = useRef(null)
   const socketRef = useRef(null)
   const saveTimerRef = useRef(null)
 
@@ -148,7 +149,12 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
       if (userName === user.name) return
       setTypingUser(userName)
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
-      typingTimerRef.current = setTimeout(() => setTypingUser(''), 2000)
+      typingTimerRef.current = setTimeout(() => setTypingUser(''), 2500)
+    })
+
+    socket.on('stop-typing', ({ userName }) => {
+      if (userName === user.name) return
+      setTypingUser('')
     })
 
     // Lock event from server
@@ -160,6 +166,7 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
     return () => {
       socket.disconnect()
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+      if (stopTypingTimerRef.current) clearTimeout(stopTypingTimerRef.current)
     }
   }, [docId, user, userColor])
 
@@ -167,6 +174,12 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
   const handleTyping = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.emit('user-typing', { docId, userName: user.name })
+      
+      // Stop typing timer
+      if (stopTypingTimerRef.current) clearTimeout(stopTypingTimerRef.current)
+      stopTypingTimerRef.current = setTimeout(() => {
+        socketRef.current.emit('user-stop-typing', { docId, userName: user.name })
+      }, 2000)
     }
   }, [docId, user.name])
 
