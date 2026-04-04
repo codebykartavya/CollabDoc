@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import api from '../utils/api'
 import Editor from '../components/Editor'
+import OnboardingTour from '../components/OnboardingTour'
 
 export default function EditorPage() {
   const { id } = useParams()
@@ -109,6 +110,7 @@ export default function EditorPage() {
       <div className="flex-1 overflow-hidden">
         <Editor docId={id} user={user} title={title} setTitle={setTitle} shareCode={docInfo.shareCode} />
       </div>
+      <OnboardingTour />
     </div>
   )
 }

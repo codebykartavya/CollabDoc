@@ -1,37 +1,74 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 
 export default function SpeechButton({ editor }) {
   const [isListening, setIsListening] = useState(false)
   const [supported] = useState(() => 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
   const recognitionRef = useRef(null)
+  const editorRef = useRef(editor)
 
-  function startListening() {
+  // Keep editorRef always in sync with latest editor instance
+  useEffect(() => {
+    editorRef.current = editor
+  }, [editor])
+
+  const startListening = useCallback(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) return
+
     const recognition = new SpeechRecognition()
     recognition.continuous = true
-    recognition.interimResults = true
+    recognition.interimResults = false // Only final results — avoids duplicates
     recognition.lang = 'en-US'
-    recognition.onstart = () => setIsListening(true)
+    recognition.maxAlternatives = 1
+
+    recognition.onstart = () => {
+      setIsListening(true)
+    }
+
     recognition.onresult = (event) => {
-      let finalTranscript = ''
+      const ed = editorRef.current
+      if (!ed) return
+
+      let transcript = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript
-        }
+        transcript += event.results[i][0].transcript
       }
-      if (finalTranscript && editor) {
-        editor.chain().focus().insertContent(finalTranscript + ' ').run()
+
+      if (transcript.trim()) {
+        // Use commands API directly — more reliable with Collaboration extension
+        ed.commands.insertContent(transcript + ' ')
       }
     }
-    recognition.onerror = () => setIsListening(false)
-    recognition.onend = () => setIsListening(false)
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error)
+      setIsListening(false)
+    }
+
+    recognition.onend = () => {
+      // Auto-restart if still in listening mode (handles Chrome's auto-stop)
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start()
+        } catch (e) {
+          // Already running or destroyed
+          setIsListening(false)
+        }
+      } else {
+        setIsListening(false)
+      }
+    }
+
     recognitionRef.current = recognition
     recognition.start()
-  }
+  }, [])
 
   function stopListening() {
-    if (recognitionRef.current) recognitionRef.current.stop()
+    const recognition = recognitionRef.current
+    recognitionRef.current = null // Prevent auto-restart in onend
+    if (recognition) {
+      recognition.stop()
+    }
     setIsListening(false)
   }
 

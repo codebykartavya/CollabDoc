@@ -15,6 +15,7 @@ import ShareModal from './ShareModal'
 import EmojiReactions from './EmojiReactions'
 import FocusMode from './FocusMode'
 import PomodoroTimer from './PomodoroTimer'
+import ExportMenu from './ExportMenu'
 
 const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316']
 
@@ -26,15 +27,23 @@ function getUserColor(userId) {
   return COLORS[Math.abs(hash) % COLORS.length]
 }
 
-export default function Editor({ docId, user, title, setTitle, shareCode }) {
+export default function Editor({ docId, user, title, setTitle, shareCode, onStatusChange }) {
   const [onlineUsers, setOnlineUsers] = useState([])
   const [typingUser, setTypingUser] = useState('')
   const [connected, setConnected] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
+
+  // Save & connection status
+  const [saveStatus, setSaveStatus] = useState('saved')
+  const [connectionStatus, setConnectionStatus] = useState('live')
+  const [isLocked, setIsLocked] = useState(false)
+  const [lockedBanner, setLockedBanner] = useState(false)
+
   const typingTimerRef = useRef(null)
   const socketRef = useRef(null)
+  const saveTimerRef = useRef(null)
 
   const userColor = useMemo(() => getUserColor(user._id), [user._id])
 
@@ -51,16 +60,25 @@ export default function Editor({ docId, user, title, setTitle, shareCode }) {
     return new IndexeddbPersistence(docId, ydoc)
   }, [docId, ydoc])
 
-  // Set awareness (cursor + user info)
+  // Set awareness (cursor + user info) + connection status tracking
   useEffect(() => {
     wsProvider.awareness.setLocalStateField('user', {
       name: user.name,
       color: userColor,
       id: user._id
     })
+
     wsProvider.on('status', ({ status }) => {
       setConnected(status === 'connected')
+
+      if (status === 'connected') setConnectionStatus('live')
+      else if (status === 'connecting') setConnectionStatus('reconnecting')
+      else if (status === 'disconnected') {
+        setConnectionStatus('offline')
+        setSaveStatus('offline')
+      }
     })
+
     return () => {
       wsProvider.awareness.setLocalStateField('user', null)
       wsProvider.destroy()
@@ -69,7 +87,31 @@ export default function Editor({ docId, user, title, setTitle, shareCode }) {
     }
   }, [wsProvider, ydoc, indexeddbProvider, user, userColor])
 
-  // Socket.io for presence
+  // Save status tracking via ydoc updates
+  useEffect(() => {
+    function handleUpdate() {
+      setSaveStatus('saving')
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(() => {
+        setSaveStatus('saved')
+      }, 1500)
+    }
+
+    ydoc.on('update', handleUpdate)
+    return () => {
+      ydoc.off('update', handleUpdate)
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [ydoc])
+
+  // Propagate status changes to parent
+  useEffect(() => {
+    if (onStatusChange) {
+      onStatusChange({ saveStatus, connectionStatus })
+    }
+  }, [saveStatus, connectionStatus, onStatusChange])
+
+  // Socket.io for presence + lock events
   useEffect(() => {
     const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:8080')
     socketRef.current = socket
@@ -80,6 +122,9 @@ export default function Editor({ docId, user, title, setTitle, shareCode }) {
       userName: user.name,
       color: userColor
     })
+
+    // Also join the doc: room for lock events
+    socket.emit('join:doc', docId)
 
     socket.on('room-members', (members) => {
       setOnlineUsers(members)
@@ -100,6 +145,12 @@ export default function Editor({ docId, user, title, setTitle, shareCode }) {
       setTypingUser(userName)
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
       typingTimerRef.current = setTimeout(() => setTypingUser(''), 2000)
+    })
+
+    // Lock event from server
+    socket.on('doc:locked', ({ isLocked: locked, lockedBy }) => {
+      setIsLocked(locked)
+      setLockedBanner(locked)
     })
 
     return () => {
@@ -131,15 +182,29 @@ export default function Editor({ docId, user, title, setTitle, shareCode }) {
     }
   })
 
+  // Apply lock state to editor
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!isLocked)
+    }
+  }, [isLocked, editor])
+
   const wordCount = editor ? editor.storage.characterCount.words() : 0
   const charCount = editor ? editor.storage.characterCount.characters() : 0
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-900">
+      {/* Lock banner */}
+      {lockedBanner && (
+        <div className="bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800 px-4 py-2 text-center text-sm text-red-700 dark:text-red-300 font-medium">
+          🔒 This document is locked by the owner. Editing is disabled.
+        </div>
+      )}
+
       {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-3 flex-shrink-0 shadow-sm">
+      <div className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-2 flex items-center gap-3 flex-shrink-0 shadow-sm">
         <input
-          className="text-lg font-semibold text-gray-800 bg-transparent border-none outline-none flex-1 min-w-0 placeholder-gray-300"
+          className="text-lg font-semibold text-gray-800 dark:text-white bg-transparent border-none outline-none flex-1 min-w-0 placeholder-gray-300 dark:placeholder-gray-600"
           value={title}
           onChange={e => setTitle(e.target.value)}
           onBlur={e => {
@@ -147,21 +212,54 @@ export default function Editor({ docId, user, title, setTitle, shareCode }) {
             document.dispatchEvent(event)
           }}
           placeholder="Untitled Document"
+          disabled={isLocked}
         />
-        <PresenceStrip users={[{ userId: user._id, userName: user.name, color: userColor }, ...onlineUsers]} />
+        <div id="presence-strip">
+          <PresenceStrip users={[{ userId: user._id, userName: user.name, color: userColor }, ...onlineUsers]} />
+        </div>
         <EmojiReactions socket={socketRef.current} docId={docId} userName={user.name} />
-        <button onClick={() => setShowShare(true)} className="text-sm bg-blue-600 text-white font-medium px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">Share</button>
-        <button onClick={() => setShowHistory(!showHistory)} className="text-sm border border-gray-300 bg-white font-medium text-gray-700 px-4 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">History</button>
+        <ExportMenu editor={editor} docTitle={title || 'document'} />
+        <button id="share-button" onClick={() => setShowShare(true)} className="text-sm bg-blue-600 text-white font-medium px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">Share</button>
+        <button onClick={() => setShowHistory(!showHistory)} className="text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium text-gray-700 dark:text-gray-300 px-4 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">History</button>
         <button onClick={() => setFocusMode(true)} className="text-sm border border-gray-200 dark:border-slate-600 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300">Focus</button>
-        <PomodoroTimer socket={socketRef.current} docId={docId} />
-        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${connected ? 'bg-green-500' : 'bg-red-400'}`} title={connected ? 'Connected' : 'Disconnected'} />
+        <div id="pomodoro-timer">
+          <PomodoroTimer socket={socketRef.current} docId={docId} />
+        </div>
+
+        {/* Save status indicator */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {saveStatus === 'saving' && (
+            <svg className="animate-spin w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          )}
+          {saveStatus === 'saved' && (
+            <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          {saveStatus === 'offline' && (
+            <svg className="w-3.5 h-3.5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          )}
+        </div>
+
+        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+          connectionStatus === 'live' ? 'bg-green-500'
+            : connectionStatus === 'reconnecting' ? 'bg-yellow-400 animate-pulse'
+            : 'bg-red-500'
+        }`} title={connectionStatus === 'live' ? 'Connected' : connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Offline'} />
       </div>
 
       {/* Toolbar */}
-      <Toolbar editor={editor} />
+      <div id="toolbar">
+        <Toolbar editor={editor} />
+      </div>
 
       {/* Word count + typing indicator */}
-      <div className="bg-white border-b border-gray-100 px-6 py-1.5 flex items-center gap-4 text-xs font-medium text-gray-400">
+      <div className="bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-6 py-1.5 flex items-center gap-4 text-xs font-medium text-gray-400 dark:text-gray-500">
         <span>{wordCount} words</span>
         <span>{charCount} characters</span>
         {typingUser && <span className="text-blue-500 italic">{typingUser} is typing...</span>}
@@ -170,12 +268,12 @@ export default function Editor({ docId, user, title, setTitle, shareCode }) {
       {/* Editor area */}
       <div className="flex flex-1 overflow-hidden relative">
         <div className="flex-1 overflow-y-auto px-4 pb-12 pt-6">
-          <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 min-h-[600px] overflow-hidden">
+          <div className="max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 min-h-[600px] overflow-hidden">
             {editor ? <EditorContent editor={editor} /> : null}
           </div>
         </div>
         {showHistory && (
-          <HistoryPanel docId={docId} onClose={() => setShowHistory(false)} />
+          <HistoryPanel docId={docId} editor={editor} onClose={() => setShowHistory(false)} />
         )}
       </div>
 
