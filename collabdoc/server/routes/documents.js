@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
       ]
     })
       .populate('owner', 'name')
-      .sort({ updatedAt: -1 });
+      .sort({ isPinned: -1, updatedAt: -1 });
 
     return res.json(docs);
   } catch (err) {
@@ -181,6 +181,94 @@ router.get('/:id/revisions', async (req, res) => {
     return res.json(revisions);
   } catch (err) {
     console.error('Get revisions error:', err.message);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PATCH /api/docs/:id/pin — toggle pin (owner only)
+router.patch('/:id/pin', async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    if (doc.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the owner can pin/unpin' });
+    }
+
+    doc.isPinned = !doc.isPinned;
+    await doc.save();
+
+    return res.json({ isPinned: doc.isPinned, message: doc.isPinned ? 'Document pinned' : 'Document unpinned' });
+  } catch (err) {
+    console.error('Pin doc error:', err.message);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PATCH /api/docs/:id/lock — toggle lock (owner only), emits socket event
+router.patch('/:id/lock', async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    if (doc.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the owner can lock/unlock' });
+    }
+
+    doc.isLocked = !doc.isLocked;
+    await doc.save();
+
+    // Emit socket event to all users in the document room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`doc:${req.params.id}`).emit('doc:locked', {
+        isLocked: doc.isLocked,
+        lockedBy: req.user._id
+      });
+    }
+
+    return res.json({ isLocked: doc.isLocked, message: doc.isLocked ? 'Document locked' : 'Document unlocked' });
+  } catch (err) {
+    console.error('Lock doc error:', err.message);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PATCH /api/docs/:id/tags — update tags (owner or collaborator)
+const ALLOWED_TAGS = ['Work', 'Personal', 'Project', 'Research', 'Other'];
+
+router.patch('/:id/tags', async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    const isOwner = doc.owner.toString() === req.user._id.toString();
+    const isCollaborator = doc.collaborators.some(
+      (c) => c.toString() === req.user._id.toString()
+    );
+
+    if (!isOwner && !isCollaborator) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const { tags } = req.body;
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({ message: 'Tags must be an array' });
+    }
+
+    // Filter to only allowed values
+    doc.tags = tags.filter(tag => ALLOWED_TAGS.includes(tag));
+    await doc.save();
+
+    return res.json({ tags: doc.tags });
+  } catch (err) {
+    console.error('Update tags error:', err.message);
     return res.status(500).json({ message: 'Server error' });
   }
 });

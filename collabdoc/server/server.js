@@ -37,6 +37,8 @@ const io = new Server(server, {
   }
 });
 
+app.set('io', io);
+
 io.on('connection', (socket) => {
   socket.on('join-room', ({ docId, userId, userName, color }) => {
     socket.join(docId);
@@ -56,8 +58,28 @@ io.on('connection', (socket) => {
     socket.emit('room-members', members);
   });
 
+  socket.on('join:doc', (docId) => {
+    socket.join(`doc:${docId}`);
+  });
+
+  socket.on('emoji-reaction', ({ docId, emoji, userName, id }) => {
+    socket.to(docId).emit('emoji-reaction', { emoji, userName, id });
+  });
+
   socket.on('user-typing', ({ docId, userName }) => {
     socket.to(docId).emit('typing', { userName });
+  });
+
+  socket.on('pomodoro-start', ({ docId, timeLeft, isBreak }) => {
+    socket.to(docId).emit('pomodoro-sync', { timeLeft, isRunning: true, isBreak });
+  });
+
+  socket.on('pomodoro-pause', ({ docId, timeLeft }) => {
+    socket.to(docId).emit('pomodoro-sync', { timeLeft, isRunning: false });
+  });
+
+  socket.on('pomodoro-reset', ({ docId, timeLeft, isBreak }) => {
+    socket.to(docId).emit('pomodoro-sync', { timeLeft, isRunning: false, isBreak });
   });
 
   socket.on('disconnect', () => {
