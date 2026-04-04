@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import api from '../utils/api'
 import Editor from '../components/Editor'
 import OnboardingTour from '../components/OnboardingTour'
+import Navbar from '../components/Navbar'
 
 export default function EditorPage() {
   const { id } = useParams()
@@ -13,6 +14,7 @@ export default function EditorPage() {
   const [error, setError] = useState('')
   const [docInfo, setDocInfo] = useState(null)
   const [title, setTitle] = useState('')
+  const [status, setStatus] = useState({ saveStatus: 'saved', connectionStatus: 'live' })
 
   useEffect(() => {
     fetchDocInfo()
@@ -50,14 +52,10 @@ export default function EditorPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center">
-            <Link to="/" className="text-xl font-bold text-gray-900">CollabDoc</Link>
-          </div>
-        </nav>
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex flex-col font-sans transition-colors duration-300">
+        <Navbar />
         <div className="flex-1 flex justify-center items-center">
-          <svg className="animate-spin h-8 w-8 text-blue-600" viewBox="0 0 24 24" fill="none">
+          <svg className="animate-spin h-8 w-8 text-blue-500" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -68,22 +66,18 @@ export default function EditorPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <nav className="bg-white border-b border-gray-200">
-          <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center">
-            <Link to="/" className="text-xl font-bold text-gray-900">CollabDoc</Link>
-          </div>
-        </nav>
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex flex-col font-sans transition-colors duration-300">
+        <Navbar />
         <div className="flex-1 flex justify-center items-center p-4">
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center max-w-md w-full">
-            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="bg-white dark:bg-[#141414] p-8 rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-black border border-gray-200 dark:border-[#2a2a2a] text-center max-w-md w-full animate-fade-up transition-colors duration-300">
+            <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Error</h2>
-            <p className="text-gray-500 mb-6">{error}</p>
-            <Link to="/dashboard" className="inline-block px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-[#f5f5f5] mb-2 transition-colors duration-300">Access Error</h2>
+            <p className="text-gray-600 dark:text-[#a1a1aa] mb-8 transition-colors duration-300">{error}</p>
+            <Link to="/dashboard" className="inline-block px-6 py-2.5 bg-gray-100 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-900 dark:text-[#f5f5f5] font-medium rounded-xl hover:bg-gray-200 hover:border-gray-300 dark:hover:bg-[#2a2a2a] dark:hover:border-[#3f3f3f] transition-all">
               Back to Dashboard
             </Link>
           </div>
@@ -93,22 +87,31 @@ export default function EditorPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 shrink-0">
-        <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center justify-center w-8 h-8 rounded hover:bg-gray-100 transition-colors">
-            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-            </svg>
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user.name}</span>
-            <button onClick={logout} className="text-sm font-medium text-gray-500 hover:text-gray-800">Logout</button>
-          </div>
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-[#0a0a0a] font-sans transition-colors duration-300">
+      <Navbar 
+        saveStatus={status.saveStatus} 
+        connectionStatus={status.connectionStatus} 
+        showBack={true} 
+      />
+
+      {docInfo?.isLocked && (
+        <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-2 flex items-center justify-center gap-3 animate-fade-in z-30 shadow-[0_4px_12px_rgba(239,68,68,0.1)]">
+          <span className="text-red-500 text-lg">🔒</span>
+          <span className="text-red-400 text-sm font-medium tracking-wide">
+            This document has been locked by the owner. It is in read-only mode and edits cannot be made at this time.
+          </span>
         </div>
-      </nav>
-      <div className="flex-1 overflow-hidden">
-        <Editor docId={id} user={user} title={title} setTitle={setTitle} shareCode={docInfo.shareCode} />
+      )}
+
+      <div className="flex-1 overflow-hidden relative z-10 flex flex-col">
+        <Editor 
+          docId={id} 
+          user={user} 
+          title={title} 
+          setTitle={setTitle} 
+          shareCode={docInfo.shareCode} 
+          onStatusChange={setStatus} 
+        />
       </div>
       <OnboardingTour />
     </div>

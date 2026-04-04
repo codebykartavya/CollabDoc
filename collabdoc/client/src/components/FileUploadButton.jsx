@@ -132,10 +132,10 @@ export default function FileUploadButton({ editor }) {
         onClick={handleClick}
         disabled={isProcessing}
         title="Upload file to edit (.txt, .md, .docx, .pdf)"
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-300 ${
           isProcessing
             ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500 border border-blue-300 dark:border-blue-700 cursor-wait'
-            : 'border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+            : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-900 dark:bg-[#111111] dark:border-[#2a2a2a] dark:text-[#a1a1aa] dark:hover:border-[#3f3f3f] dark:hover:text-[#f5f5f5]'
         }`}
       >
         {isProcessing ? (

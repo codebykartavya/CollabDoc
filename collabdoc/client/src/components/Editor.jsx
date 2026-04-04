@@ -4,6 +4,8 @@ import StarterKit from '@tiptap/starter-kit'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor'
 import CharacterCount from '@tiptap/extension-character-count'
+import { Color } from '@tiptap/extension-color'
+import TextStyle from '@tiptap/extension-text-style'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import { IndexeddbPersistence } from 'y-indexeddb'
@@ -16,6 +18,7 @@ import EmojiReactions from './EmojiReactions'
 import FocusMode from './FocusMode'
 import PomodoroTimer from './PomodoroTimer'
 import ExportMenu from './ExportMenu'
+import ColorPicker from './ColorPicker'
 
 const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316']
 
@@ -170,6 +173,8 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ history: false }),
+      TextStyle,
+      Color,
       Collaboration.configure({ document: ydoc, field: 'document' }),
       CollaborationCursor.configure({
         provider: wsProvider,
@@ -193,7 +198,7 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
   const charCount = editor ? editor.storage.characterCount.characters() : 0
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 dark:bg-slate-900">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-[#0a0a0a] transition-colors duration-300">
       {/* Lock banner */}
       {lockedBanner && (
         <div className="bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800 px-4 py-2 text-center text-sm text-red-700 dark:text-red-300 font-medium">
@@ -202,9 +207,9 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
       )}
 
       {/* Top bar */}
-      <div className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-2 flex items-center gap-3 flex-shrink-0 shadow-sm">
+      <div className="bg-white dark:bg-[#111111] border-b border-gray-200 dark:border-[#2a2a2a] px-4 py-2 flex items-center gap-3 flex-shrink-0 shadow-sm transition-colors duration-300">
         <input
-          className="text-lg font-semibold text-gray-800 dark:text-white bg-transparent border-none outline-none flex-1 min-w-0 placeholder-gray-300 dark:placeholder-gray-600"
+          className="text-lg font-semibold text-gray-900 dark:text-[#f5f5f5] bg-transparent border-none outline-none flex-1 min-w-0 placeholder-gray-400 dark:placeholder-[#52525b] transition-colors duration-300"
           value={title}
           onChange={e => setTitle(e.target.value)}
           onBlur={e => {
@@ -220,8 +225,8 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
         <EmojiReactions socket={socketRef.current} docId={docId} userName={user.name} />
         <ExportMenu editor={editor} docTitle={title || 'document'} />
         <button id="share-button" onClick={() => setShowShare(true)} className="text-sm bg-blue-600 text-white font-medium px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">Share</button>
-        <button onClick={() => setShowHistory(!showHistory)} className="text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium text-gray-700 dark:text-gray-300 px-4 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">History</button>
-        <button onClick={() => setFocusMode(true)} className="text-sm border border-gray-200 dark:border-slate-600 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300">Focus</button>
+        <button onClick={() => setShowHistory(!showHistory)} className="text-sm border border-gray-300 dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] font-medium text-gray-700 dark:text-[#f5f5f5] px-4 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors">History</button>
+        <button onClick={() => setFocusMode(true)} className="text-sm border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2a2a2a] text-gray-700 dark:text-[#f5f5f5] transition-colors">Focus</button>
         <div id="pomodoro-timer">
           <PomodoroTimer socket={socketRef.current} docId={docId} />
         </div>
@@ -259,7 +264,7 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
       </div>
 
       {/* Word count + typing indicator */}
-      <div className="bg-white dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 px-6 py-1.5 flex items-center gap-4 text-xs font-medium text-gray-400 dark:text-gray-500">
+      <div className="bg-white dark:bg-[#111111] border-b border-gray-100 dark:border-[#1f1f1f] px-6 py-1.5 flex items-center gap-4 text-xs font-medium text-gray-500 dark:text-[#71717a] transition-colors duration-300">
         <span>{wordCount} words</span>
         <span>{charCount} characters</span>
         {typingUser && <span className="text-blue-500 italic">{typingUser} is typing...</span>}
@@ -267,8 +272,9 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
 
       {/* Editor area */}
       <div className="flex flex-1 overflow-hidden relative">
+        <ColorPicker editor={editor} />
         <div className="flex-1 overflow-y-auto px-4 pb-12 pt-6">
-          <div className="max-w-4xl mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 min-h-[600px] overflow-hidden">
+          <div className="max-w-4xl mx-auto bg-white dark:bg-[#141414] rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] border border-gray-200 dark:border-[#2a2a2a] min-h-[600px] overflow-hidden transition-colors duration-300">
             {editor ? <EditorContent editor={editor} /> : null}
           </div>
         </div>

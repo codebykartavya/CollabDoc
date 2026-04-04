@@ -17,7 +17,11 @@ function GuestRoute({ children }) {
   return !isAuthenticated ? children : <Navigate to="/dashboard" replace />
 }
 
+import { useTheme } from './hooks/useTheme'
+
 export default function App() {
+  useTheme()
+
   return (
     <>
       <KeyboardShortcutsModal />

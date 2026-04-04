@@ -26,6 +26,18 @@ const documentSchema = new mongoose.Schema({
     type: Buffer,
     default: null
   },
+  isPinned: {
+    type: Boolean,
+    default: false
+  },
+  isLocked: {
+    type: Boolean,
+    default: false
+  },
+  tags: {
+    type: [String],
+    default: []
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -33,6 +45,19 @@ const documentSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  tags: [
+    {
+      type: String
+    }
+  ],
+  isPinned: {
+    type: Boolean,
+    default: false
+  },
+  isLocked: {
+    type: Boolean,
+    default: false
   }
 });
 
