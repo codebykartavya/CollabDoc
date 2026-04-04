@@ -196,7 +196,8 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
       }),
       CharacterCount
     ],
-    onUpdate: () => {
+    onUpdate: ({ transaction }) => {
+      if (transaction.getMeta('y-sync$')) return
       handleTyping()
     }
   })
