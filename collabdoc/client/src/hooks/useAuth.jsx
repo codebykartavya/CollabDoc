@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
+  const navigate = useNavigate()
   const [authState, setAuthState] = useState(() => {
     const token = localStorage.getItem('token')
     const userStr = localStorage.getItem('user')
@@ -25,7 +27,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     setAuthState({ token: null, user: null })
-    window.location.href = '/login'
+    navigate('/login')
   }
 
   const isAuthenticated = !!authState.token && !!authState.user

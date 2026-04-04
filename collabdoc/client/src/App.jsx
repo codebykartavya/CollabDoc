@@ -31,7 +31,7 @@ export default function App() {
         <Route path="/signup" element={<GuestRoute><Signup /></GuestRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/doc/:id" element={<ProtectedRoute><EditorPage /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </>
   )

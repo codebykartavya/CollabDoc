@@ -145,6 +145,7 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
     })
 
     socket.on('typing', ({ userName }) => {
+      if (userName === user.name) return
       setTypingUser(userName)
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
       typingTimerRef.current = setTimeout(() => setTypingUser(''), 2000)
