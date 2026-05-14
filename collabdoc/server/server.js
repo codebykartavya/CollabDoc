@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const Y = require('yjs');
 const { setupWSConnection } = require('y-websocket/bin/utils');
 const WebSocket = require('ws');
+const rateLimit = require('express-rate-limit');
 const Document = require('./models/Document');
 const Revision = require('./models/Revision');
 const authRoutes = require('./routes/auth');
@@ -21,6 +22,24 @@ app.use(cors({
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
 }));
 app.use(express.json());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // max 100 requests per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please try again later.' }
+});
+app.use('/api/', limiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { message: 'Too many login attempts, please try again later.' }
+});
+app.use('/api/auth', authLimiter);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/docs', authMiddleware, docRoutes);
 app.get('/', (req, res) => res.json({ status: 'ok', message: 'CollabDoc API is running' }));
@@ -97,6 +116,7 @@ io.on('connection', (socket) => {
 const wss = new WebSocket.Server({ noServer: true });
 const ydocs = new Map(); // docId -> Y.Doc
 const saveTimers = new Map(); // docId -> timeout
+const docUsers = new Map(); // docName -> { userId, userName }
 
 function getYDoc(docName) {
   if (!ydocs.has(docName)) {
@@ -134,6 +154,18 @@ wss.on('connection', async (conn, req) => {
   const docName = req.url.slice(1).split('?')[0].replace(/^\//, '');
   const ydoc = getYDoc(docName);
 
+  // Extract userId and userName from query params
+  const urlParams = new URLSearchParams(req.url.split('?')[1] || '');
+  const userId = urlParams.get('userId');
+  const userName = urlParams.get('userName');
+  conn.userId = userId;
+  conn.userName = userName;
+
+  // Track the last connected user per doc for revision attribution
+  if (userId && userName) {
+    docUsers.set(docName, { userId, userName });
+  }
+
   // Load existing state from MongoDB on first connection to this doc
   if (ydoc.store.clients.size === 0) {
     await loadDocState(docName, ydoc);
@@ -145,7 +177,8 @@ wss.on('connection', async (conn, req) => {
   ydoc.on('update', () => {
     if (saveTimers.has(docName)) clearTimeout(saveTimers.get(docName));
     saveTimers.set(docName, setTimeout(() => {
-      saveDocState(docName, ydoc, null, null);
+      const userInfo = docUsers.get(docName) || {};
+      saveDocState(docName, ydoc, userInfo.userId || null, userInfo.userName || null);
     }, 3000));
   });
 });

@@ -45,19 +45,6 @@ const documentSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
-  },
-  tags: [
-    {
-      type: String
-    }
-  ],
-  isPinned: {
-    type: Boolean,
-    default: false
-  },
-  isLocked: {
-    type: Boolean,
-    default: false
   }
 });
 

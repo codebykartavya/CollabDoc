@@ -56,8 +56,11 @@ export default function Editor({ docId, user, title, setTitle, shareCode, onStat
 
   const wsProvider = useMemo(() => {
     const wsBase = import.meta.env.VITE_WS_URL || 'ws://localhost:8080'
-    return new WebsocketProvider(`${wsBase}/ws`, docId, ydoc, { connect: true })
-  }, [docId, ydoc])
+    return new WebsocketProvider(`${wsBase}/ws`, docId, ydoc, {
+      connect: true,
+      params: { userId: user._id, userName: user.name }
+    })
+  }, [docId, ydoc, user._id, user.name])
 
   // Offline persistence
   const indexeddbProvider = useMemo(() => {

@@ -1,4 +1,5 @@
 const express = require('express');
+const validator = require('validator');
 const Document = require('../models/Document');
 const Revision = require('../models/Revision');
 
@@ -43,8 +44,11 @@ router.post('/', async (req, res) => {
       shareCode = generateShareCode();
     }
 
+    const rawTitle = req.body.title || 'Untitled';
+    const title = validator.escape(rawTitle.trim()).slice(0, 100);
+
     const doc = await Document.create({
-      title: req.body.title || 'Untitled',
+      title,
       shareCode,
       owner: req.user._id
     });
@@ -52,6 +56,43 @@ router.post('/', async (req, res) => {
     return res.status(201).json(doc);
   } catch (err) {
     console.error('Create doc error:', err.message);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/docs/join — join a document via share code
+// NOTE: This must be defined BEFORE any /:id routes so Express doesn't match "join" as an :id param
+router.post('/join', async (req, res) => {
+  try {
+    const { shareCode } = req.body;
+
+    if (!shareCode) {
+      return res.status(400).json({ message: 'Share code is required' });
+    }
+
+    // Case-insensitive search
+    const doc = await Document.findOne({
+      shareCode: shareCode.toUpperCase()
+    });
+
+    if (!doc) {
+      return res.status(404).json({ message: 'Document not found with that share code' });
+    }
+
+    // Add user as collaborator if not already present
+    const alreadyCollaborator = doc.collaborators.some(
+      (c) => c.toString() === req.user._id.toString()
+    );
+    const isOwner = doc.owner.toString() === req.user._id.toString();
+
+    if (!alreadyCollaborator && !isOwner) {
+      doc.collaborators.push(req.user._id);
+      await doc.save();
+    }
+
+    return res.json(doc);
+  } catch (err) {
+    console.error('Join doc error:', err.message);
     return res.status(500).json({ message: 'Server error' });
   }
 });
@@ -99,7 +140,8 @@ router.patch('/:id/title', async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    doc.title = req.body.title || doc.title;
+    const rawTitle = req.body.title || doc.title;
+    doc.title = validator.escape(rawTitle.trim()).slice(0, 100);
     doc.updatedAt = new Date();
     await doc.save();
 
@@ -135,41 +177,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /api/docs/join — join a document via share code
-router.post('/join', async (req, res) => {
-  try {
-    const { shareCode } = req.body;
 
-    if (!shareCode) {
-      return res.status(400).json({ message: 'Share code is required' });
-    }
-
-    // Case-insensitive search
-    const doc = await Document.findOne({
-      shareCode: shareCode.toUpperCase()
-    });
-
-    if (!doc) {
-      return res.status(404).json({ message: 'Document not found with that share code' });
-    }
-
-    // Add user as collaborator if not already present
-    const alreadyCollaborator = doc.collaborators.some(
-      (c) => c.toString() === req.user._id.toString()
-    );
-    const isOwner = doc.owner.toString() === req.user._id.toString();
-
-    if (!alreadyCollaborator && !isOwner) {
-      doc.collaborators.push(req.user._id);
-      await doc.save();
-    }
-
-    return res.json(doc);
-  } catch (err) {
-    console.error('Join doc error:', err.message);
-    return res.status(500).json({ message: 'Server error' });
-  }
-});
 
 // GET /api/docs/:id/revisions — get revision history
 router.get('/:id/revisions', async (req, res) => {
@@ -262,8 +270,12 @@ router.patch('/:id/tags', async (req, res) => {
       return res.status(400).json({ message: 'Tags must be an array' });
     }
 
-    // Filter to only allowed values
-    doc.tags = tags.filter(tag => ALLOWED_TAGS.includes(tag));
+    // Sanitize and filter to only allowed values
+    const sanitizedTags = tags
+      .filter(t => typeof t === 'string')
+      .map(t => t.trim())
+      .filter(t => t.length > 0 && ALLOWED_TAGS.includes(t));
+    doc.tags = sanitizedTags;
     await doc.save();
 
     return res.json({ tags: doc.tags });
